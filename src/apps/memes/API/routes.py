@@ -12,6 +12,7 @@ from src.apps.memes.models import Keyword, Memes, Owner
 from src.apps.memes.schemas import MemeFormSchema, MemeSchema
 from src.integrations.openai import OpenAI
 from src.integrations.postsyncer import Postsyncer
+from src.integrations.postsyncer.schemas import PostsyncerSchema
 
 router = Router(tags=["Memes"])
 
@@ -133,3 +134,17 @@ def create_file(request, file: UploadedFile = File(...)):
             print(f"Error OpenAI: {e}")
 
         return 201, instance
+
+
+@router.post(
+    "/social-media",
+    response={
+        200: PostsyncerSchema,
+        500: None,
+    },
+)
+def get_social_media(request, payload: MemeFormSchema):
+    postsyncer = Postsyncer()
+    social_media_data = postsyncer.get_social_media(payload.url)
+    instance = PostsyncerSchema.model_validate(social_media_data)
+    return 200, instance
