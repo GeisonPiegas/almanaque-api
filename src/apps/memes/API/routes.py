@@ -13,7 +13,7 @@ from src.apps.memes.schemas import MemeFormSchema, MemeSchema
 from src.integrations.openai import OpenAI
 from src.integrations.postsyncer import Postsyncer
 from src.integrations.postsyncer.schemas import PostsyncerSchema
-from src.utils.movie import generate_video_thumbnail
+from src.utils.movie import generate_video_thumbnail_from_upload
 
 router = Router(tags=["Memes"])
 
@@ -108,10 +108,10 @@ def create_media(request, media: UploadedFile = File(...)):
     extension = media.content_type.split("/")[1]
 
     if extension not in extensions:
-        raise HTTPException(status_code=400, detail="Invalid file type")
+        raise HTTPException(status_code=400, detail="Invalid media type, possible types jpg, jpeg, png, gif, mp4")
 
     if cast(int, media.size) > max_size:
-        raise HTTPException(status_code=400, detail="File size exceeds limit")
+        raise HTTPException(status_code=400, detail="File size exceeds limit 5MB")
 
     with transaction.atomic():
         instance = Memes.objects.create(
@@ -119,8 +119,7 @@ def create_media(request, media: UploadedFile = File(...)):
         )
 
         if extension == "mp4":
-            media_path = instance.media.path
-            thumbnail: ContentFile = generate_video_thumbnail(media_path)
+            thumbnail: ContentFile = generate_video_thumbnail_from_upload(media)
             instance.thumbnail = thumbnail
             instance.save()
 
