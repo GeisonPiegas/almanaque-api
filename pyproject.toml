@@ -1,0 +1,53 @@
+[project]
+name = "Meme"
+version = "0.1.0"
+description = "Meme as a service"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "django>=5.2.5",
+    "django-cors-headers>=4.7.0",
+    "django-ninja>=1.4.3",
+    "django-storages>=1.14.6",
+    "google-cloud-storage>=3.3.1",
+    "gunicorn==23.0.0",
+    "instaloader>=4.15",
+    "openai>=2.8.1",
+    "psycopg[binary]>=3.2.9",
+    "pydantic[email]>=2.11.7",
+    "python-dotenv>=1.1.1",
+    "requests>=2.32.5",
+]
+
+[dependency-groups]
+dev = [
+    "debugpy>=1.8.16",
+    "ruff>=0.14.0",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+select = ["E", "F", "I", "UP", "DJ"]
+ignore = ["E501", "I001", "DJ001"]
+src = ["src"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.basedpyright]
+typeCheckingMode = "basic"
+reportOptionalMemberAccess = "none"
+reportGeneralTypeIssues = "none"
+reportCallIssue = "none"
+reportArgumentType = "none"
+reportAttributeAccessIssue = "none"
+reportAssignmentType = "none"
+exclude = [
+  "**/__pycache__",
+  "**/.venv",
+  "**/venv"
+]

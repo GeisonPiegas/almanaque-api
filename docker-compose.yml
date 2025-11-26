@@ -1,0 +1,52 @@
+services:
+  almanaque-service:
+    image: almanaque-service
+    container_name: almanaque-service
+    build:
+      context: .
+      dockerfile: .docker/Dockerfile
+      args:
+        INSTALL_DEV: ${INSTALL_DEV:-true}
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
+    command: >
+      sh -c "
+        uv run python manage.py migrate &&
+        uv run python -Xfrozen_modules=off -m debugpy --listen 0.0.0.0:5678 -m django runserver 0.0.0.0:8000 --settings=config.settings
+      "
+    volumes:
+      - .:/home/app/web
+    ports:
+      - "8000:8000"
+      - "5678:5678"
+    depends_on:
+      almanaque-service-database:
+        condition: service_healthy
+    networks:
+      - internal-net
+
+  almanaque-service-database:
+    image: postgres:16
+    container_name: almanaque-service-database
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_DB=almanaque_bank
+      - POSTGRES_USER=almanaque_user
+      - POSTGRES_PASSWORD=almanaque_password
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U almanaque_user -d almanaque_bank"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal-net
+
+networks:
+  internal-net:
+    external: true
+
+volumes:
+  postgres_data:
