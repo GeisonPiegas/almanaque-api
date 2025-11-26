@@ -6,6 +6,7 @@ from django.utils.translation import gettext_lazy as _
 
 from src.apps.memes.enums import MEME_STATUS, MEME_TYPE, MemeStatus, MemeType
 from src.utils.models import SoftDeleteModel
+from src.utils.upload_file import path_and_rename_media, path_and_rename_thumbnail
 
 
 class Keyword(models.Model):
@@ -24,8 +25,8 @@ class Memes(SoftDeleteModel):
     description = models.TextField(null=True, verbose_name=_("Description"))
     type = models.IntegerField(null=True, verbose_name=_("Type"), choices=MEME_TYPE, default=MemeType.IMAGE)
     status = models.IntegerField(null=True, choices=MEME_STATUS, default=MemeStatus.PENDING, verbose_name=_("Status"))
-    file = models.FileField(null=True, verbose_name=_("File"))
-    thumbnail = models.FileField(null=True, verbose_name=_("Thumbnail"))
+    thumbnail = models.FileField(null=True, upload_to=path_and_rename_thumbnail, verbose_name=_("Thumbnail"))
+    media = models.FileField(null=True, upload_to=path_and_rename_media, verbose_name=_("Media"))
     provider = models.CharField(null=True, max_length=255, verbose_name=_("Provider"))
     external_link = models.URLField(null=True, verbose_name=_("External Link"))
     metadata = models.JSONField(null=True)
@@ -48,21 +49,8 @@ class Memes(SoftDeleteModel):
     def __str__(self):
         return f"{self.uuid}"
 
-    def file_to_base64(self):
-        f = self.file
-        if not f:
-            return None
-
-        f.open("rb")
-        try:
-            data = f.read()
-        finally:
-            f.close()
-
-        return base64.b64encode(data).decode("utf-8")
-
-    def thumbnail_to_base64(self):
-        f = self.thumbnail
+    def media_to_base64(self):
+        f = self.thumbnail if self.thumbnail else self.media
         if not f:
             return None
 

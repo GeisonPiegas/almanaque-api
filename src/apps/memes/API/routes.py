@@ -13,6 +13,7 @@ from src.apps.memes.schemas import MemeFormSchema, MemeSchema
 from src.integrations.openai import OpenAI
 from src.integrations.postsyncer import Postsyncer
 from src.integrations.postsyncer.schemas import PostsyncerSchema
+from src.utils.movie import generate_video_thumbnail
 
 router = Router(tags=["Memes"])
 
@@ -25,7 +26,7 @@ router = Router(tags=["Memes"])
     },
 )
 @paginate(LimitOffsetPagination)
-def get(request, filters: MemeFilterSchema = Query(...)):
+def list(request, filters: MemeFilterSchema = Query(...)):
     queryset = Memes.objects.all()
     return filters.filter(queryset)
 
@@ -37,13 +38,10 @@ def get(request, filters: MemeFilterSchema = Query(...)):
         500: None,
     },
 )
-def create_url(request, payload: MemeFormSchema):
+def create_media_url(request, payload: MemeFormSchema):
     with transaction.atomic():
         postsyncer = Postsyncer()
         social_media_data = postsyncer.get_social_media(payload.url)
-
-        _thumbnail = requests.get(social_media_data.get("thumbnail"))
-        thumbnail = ContentFile(_thumbnail.content, name="download.png")
 
         owner = None
         social_media_owner = social_media_data.get("owner")
@@ -56,19 +54,22 @@ def create_url(request, payload: MemeFormSchema):
                 },
             )
 
-        file = None
+        media = None
+        thumbnail = None
         medias = social_media_data.get("medias")
 
         if picture := medias.get("images", []):
             _picture = requests.get(picture[0].get("url"))
-            file = ContentFile(_picture.content, name=f"{picture[0].get('id')}.{picture[0].get('extension')}")
+            media = ContentFile(_picture.content, name=f"{picture[0].get('id')}.{picture[0].get('extension')}")
 
         if movie := medias.get("videos", []):
+            _thumbnail = requests.get(social_media_data.get("thumbnail"))
+            thumbnail = ContentFile(_thumbnail.content, name="thumbnail.png")
             _movie = requests.get(movie[0].get("url"))
-            file = ContentFile(_movie.content, name=f"{movie[0].get('id')}.{movie[0].get('extension')}")
+            media = ContentFile(_movie.content, name=f"{movie[0].get('id')}.{movie[0].get('extension')}")
 
         instance = Memes.objects.create(
-            file=file,
+            media=media,
             thumbnail=thumbnail,
             owner=owner,
             provider=social_media_data.get("source"),
@@ -77,7 +78,7 @@ def create_url(request, payload: MemeFormSchema):
 
         try:
             openai = OpenAI()
-            _openai = openai.process_image(instance.thumbnail_to_base64())
+            _openai = openai.process_image(instance.media_to_base64())
 
             keywords = []
             for keyword in _openai.get("keywords", []):
@@ -95,31 +96,37 @@ def create_url(request, payload: MemeFormSchema):
 
 
 @router.post(
-    "/files",
+    "/media",
     response={
         201: MemeSchema,
         500: None,
     },
 )
-def create_file(request, file: UploadedFile = File(...)):
+def create_media(request, media: UploadedFile = File(...)):
     max_size = 1024 * 1024 * 5
     extensions = ["jpg", "jpeg", "png", "gif", "mp4"]
+    extension = media.content_type.split("/")[1]
 
-    if file.content_type.split("/")[1] not in extensions:
+    if extension not in extensions:
         raise HTTPException(status_code=400, detail="Invalid file type")
 
-    if cast(int, file.size) > max_size:
+    if cast(int, media.size) > max_size:
         raise HTTPException(status_code=400, detail="File size exceeds limit")
 
     with transaction.atomic():
         instance = Memes.objects.create(
-            file=file,
-            thumbnail=file,
+            media=media,
         )
+
+        if extension == "mp4":
+            media_path = instance.media.path
+            thumbnail: ContentFile = generate_video_thumbnail(media_path)
+            instance.thumbnail = thumbnail
+            instance.save()
 
         try:
             openai = OpenAI()
-            _openai = openai.process_image(instance.thumbnail_to_base64())
+            _openai = openai.process_image(instance.media_to_base64())
 
             keywords = []
             for keyword in _openai.get("keywords", []):
@@ -137,7 +144,7 @@ def create_file(request, file: UploadedFile = File(...)):
 
 
 @router.post(
-    "/social-media",
+    "/search",
     response={
         200: PostsyncerSchema,
         500: None,
