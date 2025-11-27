@@ -43,4 +43,4 @@ def generate_video_thumbnail_from_upload(
     image.save(buffer, format="JPEG")
     buffer.seek(0)
 
-    return ContentFile(buffer.getvalue(), name="thumbnail.jpg")
+    return ContentFile(buffer.getvalue(), name="thumbnail.jpeg")

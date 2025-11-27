@@ -9,7 +9,7 @@ from ninja.pagination import LimitOffsetPagination, paginate
 
 from src.apps.memes.filters import MemeFilterSchema
 from src.apps.memes.models import Keyword, Memes, Owner
-from src.apps.memes.schemas import MemeFormSchema, MemeSchema
+from src.apps.memes.schemas import MemeFormSchema, MemeMediaFormSchema, MemeSchema
 from src.integrations.openai import OpenAI
 from src.integrations.postsyncer import Postsyncer
 from src.integrations.postsyncer.schemas import PostsyncerSchema
@@ -154,3 +154,63 @@ def get_social_media(request, payload: MemeFormSchema):
     social_media_data = postsyncer.get_social_media(payload.url)
     instance = PostsyncerSchema.model_validate(social_media_data)
     return 200, instance
+
+
+@router.post(
+    "/data",
+    response={
+        201: MemeSchema,
+        500: None,
+    },
+)
+def create_media_data(request, payload: MemeMediaFormSchema):
+    with transaction.atomic():
+        owner = None
+
+        if payload.owner:
+            owner, _ = Owner.objects.get_or_create(
+                username=payload.owner.username,
+                defaults={
+                    "name": payload.owner.name,
+                    "is_verified": payload.owner.is_verified,
+                },
+            )
+
+        media = None
+        thumbnail = None
+
+        if media.type == "images":
+            _picture = requests.get(media.url)
+            media = ContentFile(_picture.content, name=f"{media.id}.{media.extension}")
+
+        if media.type == "videos":
+            _thumbnail = requests.get(media.thumbnail)
+            thumbnail = ContentFile(_thumbnail.content, name="thumbnail.png")
+            _movie = requests.get(media.url)
+            media = ContentFile(_movie.content, name=f"{media.id}.{media.extension}")
+
+        instance = Memes.objects.create(
+            media=media,
+            thumbnail=thumbnail,
+            owner=owner,
+            provider=media.source,
+            external_link=media.url,
+        )
+
+        try:
+            openai = OpenAI()
+            _openai = openai.process_image(instance.media_to_base64())
+
+            keywords = []
+            for keyword in _openai.get("keywords", []):
+                _keyword, _ = Keyword.objects.get_or_create(name=keyword.upper())
+                keywords.append(_keyword)
+
+            instance.title = _openai.get("title")
+            instance.description = _openai.get("description")
+            instance.keywords.set(keywords)
+            instance.save()
+        except Exception as e:
+            print(f"Error OpenAI: {e}")
+
+        return 201, instance

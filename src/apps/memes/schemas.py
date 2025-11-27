@@ -47,3 +47,36 @@ class MemeFormSchema(Schema):
     url: str = Field(..., description=_("URL"))
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class MemeMediaSchema(Schema):
+    id: str = Field(..., description=_("ID"))
+    url: str = Field(..., description=_("URL"))
+    type: str = Field(..., description=_("Type"))
+    extension: str = Field(..., description=_("Extension"))
+    quality: str = Field(..., description=_("Quality"))
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MemeOwnerSchema(Schema):
+    id: int = Field(..., description=_("ID"))
+    username: str = Field(..., description=_("Username"))
+    profile_pic_url: str | None = Field(None, description=_("Profile Picture URL"))
+    full_name: str | None = Field(None, description=_("Full Name"))
+    is_verified: bool = Field(..., description=_("Is Verified"))
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MemeMediaFormSchema(Schema):
+    url: str = Field(..., description=_("URL"))
+    source: str | None = Field(None, description=_("Source"))
+    author: str | None = Field(None, description=_("Author"))
+    title: str | None = Field(None, description=_("Title"))
+    thumbnail: str = Field(None, description=_("Thumbnail"))
+    owner: MemeOwnerSchema | None = Field(None, description=_("Owner"))
+    media: MemeMediaSchema = Field(..., description=_("Media"))
+    type: str = Field(..., description=_("Type"))
+
+    model_config = ConfigDict(from_attributes=True)
