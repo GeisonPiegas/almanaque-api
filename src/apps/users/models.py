@@ -3,15 +3,18 @@ import uuid
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from src.utils.models import SoftDeleteModel
 
-
-class Users(SoftDeleteModel):
+class Users(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255, verbose_name=_("Name"))
     external_id = models.CharField(max_length=255, verbose_name=_("External ID"))
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        db_table = "users"
+        verbose_name = _("User")
+        verbose_name_plural = _("Users")
         ordering = ["name"]
 
     def __str__(self):

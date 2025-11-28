@@ -9,9 +9,9 @@ from config import settings
 from config.exceptions import set_default_exc_handlers
 
 api = NinjaAPI(
-    title="Memes API",
+    title="Almanaque API",
     version="1.0.0",
-    description="Serviço de memes",
+    description="Serviço do almanaque",
     docs_url="/swagger/",
     servers=[
         {"url": "http://localhost:8000", "description": "Local"},
@@ -22,7 +22,7 @@ api = NinjaAPI(
 __API_PREFIX_V1 = "api/v1"
 
 
-api.add_router(f"{__API_PREFIX_V1}/memes", "src.apps.memes.API.routes.router")
+api.add_router(f"{__API_PREFIX_V1}/posts", "src.apps.posts.API.routes.router")
 
 
 @api.get(

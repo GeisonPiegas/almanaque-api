@@ -28,7 +28,8 @@ CORS_ALLOW_ALL_ORIGINS = True
 # Application definition
 INSTALLED_APPS = [
     "corsheaders",
-    "src.apps.memes",
+    "src.apps.posts",
+    "src.apps.users",
 ]
 
 MIDDLEWARE = [
