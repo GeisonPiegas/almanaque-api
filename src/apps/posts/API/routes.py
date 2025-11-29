@@ -1,10 +1,13 @@
+import uuid
 from http.client import HTTPException
 from typing import cast
 
 import requests
-from config.auth import SupabaseJWTAuth
+
+# from config.auth import SupabaseJWTAuth
 from django.core.files.base import ContentFile
 from django.db import transaction
+from django.shortcuts import get_object_or_404
 from ninja import File, Query, Router, UploadedFile
 from ninja.pagination import LimitOffsetPagination, paginate
 
@@ -15,6 +18,7 @@ from src.apps.posts.schemas import (
     PostFormSchema,
     PostMediaFormSchema,
     PostSchema,
+    PostUpdateFormSchema,
     ReactionFormSchema,
     ReactionSchema,
     ReportFormSchema,
@@ -37,19 +41,19 @@ router = Router(tags=["Posts"])
 )
 @paginate(LimitOffsetPagination)
 def list(request, filters: PostFilterSchema = Query(...)):
-    queryset = Posts.objects.all()
+    queryset = Posts.objects.select_related("owner").prefetch_related("keywords").prefetch_related("reactions")
     return filters.filter(queryset)
 
 
+# auth=SupabaseJWTAuth(),
 @router.post(
     "",
-    auth=SupabaseJWTAuth(),
     response={
         201: PostSchema,
         500: None,
     },
 )
-def create_media_url(request, payload: PostFormSchema):
+def create(request, payload: PostFormSchema):
     with transaction.atomic():
         postsyncer = Postsyncer()
         social_media_data = postsyncer.get_social_media(payload.url)
@@ -108,6 +112,27 @@ def create_media_url(request, payload: PostFormSchema):
             print(f"Error OpenAI: {e}")
 
         return 201, instance
+
+
+@router.put(
+    "{uuid:uuid}",
+    response={
+        201: PostSchema,
+        500: None,
+    },
+)
+def update(request, uuid: uuid.UUID, payload: PostUpdateFormSchema):
+    instance = get_object_or_404(Posts, uuid=uuid)
+    instance.title = payload.title
+    instance.description = payload.description
+
+    keywords = []
+    for keyword in payload.keywords:
+        _keyword, _ = Keywords.objects.get_or_create(name=keyword.upper())
+        keywords.append(_keyword)
+
+    instance.keywords.set(keywords)
+    instance.save()
 
 
 @router.post(
@@ -252,7 +277,7 @@ def create_report(request, payload: ReportFormSchema):
         post=post,
         reason=payload.reason,
         status=ReportStatus.PENDING,
-        user_id="afa3c3b8-a5fa-4430-923d-c37f31739094",
+        user_id=request.user.id,
     )
 
     return 201, instance
@@ -272,7 +297,7 @@ def create_reaction(request, payload: ReactionFormSchema):
 
     instance, created = Reactions.objects.get_or_create(
         post=post,
-        user_id="afa3c3b8-a5fa-4430-923d-c37f31739094",
+        user_id=request.user.id,
         defaults={
             "type": payload.type,
         },

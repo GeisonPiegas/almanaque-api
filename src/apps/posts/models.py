@@ -11,6 +11,7 @@ from src.apps.posts.enums import (
     REPORT_REASONS,
     REPORT_STATUS,
     PostStatus,
+    ReactionTypes,
     ReportStatus,
 )
 from src.utils.models import SoftDeleteModel
@@ -61,6 +62,19 @@ class Posts(SoftDeleteModel):
 
     def __str__(self):
         return f"{self.uuid}"
+
+    @property
+    def reactions_summary(self):
+        reactions = self.reactions.all()
+        return {
+            "likes": reactions.filter(type=ReactionTypes.LIKE).count(),
+            "loves": reactions.filter(type=ReactionTypes.LOVE).count(),
+            "laughs": reactions.filter(type=ReactionTypes.LAUGH).count(),
+            "wow": reactions.filter(type=ReactionTypes.WOW).count(),
+            "sad": reactions.filter(type=ReactionTypes.SAD).count(),
+            "angry": reactions.filter(type=ReactionTypes.ANGRY).count(),
+            "insightful": reactions.filter(type=ReactionTypes.INSIGHTFUL).count(),
+        }
 
     def media_to_base64(self):
         f = self.thumbnail if self.thumbnail else self.media

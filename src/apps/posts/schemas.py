@@ -24,6 +24,18 @@ class OwnerSchema(Schema):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PostReactionSummarySchema(Schema):
+    likes: int = Field(..., description=_("Number of Likes"))
+    loves: int = Field(..., description=_("Number of Loves"))
+    laughs: int = Field(..., description=_("Number of Laughs"))
+    wow: int = Field(..., description=_("Number of Wow"))
+    sad: int = Field(..., description=_("Number of Sad"))
+    angry: int = Field(..., description=_("Number of Angry"))
+    insightful: int = Field(..., description=_("Number of Insightful"))
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class PostSchema(Schema):
     uuid: UUID4 = Field(..., description=_("Unique Identifier"))
     title: str | None = Field(None, description=_("Title"))
@@ -37,8 +49,17 @@ class PostSchema(Schema):
     metadata: dict[str, Any] | None = Field(None, description=_("Metadata"))
     keywords: list[KeywordSchema] = Field(None, description=_("Keywords"))
     owner: OwnerSchema | None = Field(None, description=_("Owner"))
+    reactions_summary: PostReactionSummarySchema = Field(..., description=_("Reactions Count"))
     created_at: datetime = Field(..., description=_("Created At"))
     updated_at: datetime = Field(..., description=_("Updated At"))
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PostUpdateFormSchema(Schema):
+    title: str = Field(..., description=_("Title"))
+    description: str = Field(..., description=_("Description"))
+    keywords: list[str] = Field(..., description=_("Keywords"))
 
     model_config = ConfigDict(from_attributes=True)
 
