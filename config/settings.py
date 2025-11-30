@@ -29,6 +29,7 @@ CORS_ALLOW_ALL_ORIGINS = True
 INSTALLED_APPS = [
     "corsheaders",
     "src.apps.posts",
+    "src.apps.reports",
     "src.apps.users",
 ]
 

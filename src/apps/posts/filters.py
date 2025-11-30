@@ -10,7 +10,7 @@ class PostFilterSchema(FilterSchema):
             "title__icontains",
             "description__icontains",
             "keywords__name__icontains",
-            "owners__username__icontains",
+            "owner__username__icontains",
         ],
     )
     status: list[int] | None = Field(None, q=["status__in"], alias="status[]")

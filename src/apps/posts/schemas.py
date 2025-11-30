@@ -5,7 +5,8 @@ from django.utils.translation import gettext_lazy as _
 from ninja import Field, Schema
 from pydantic import UUID4, ConfigDict
 
-from src.apps.posts.enums import PostStatus, PostTypes, ReactionTypes, ReportReasons, ReportStatus
+from src.apps.posts.enums import PostStatus, PostTypes, ReactionTypes
+from src.apps.reports.enums import ReportReasons, ReportStatus
 
 
 class KeywordSchema(Schema):
@@ -49,6 +50,7 @@ class PostSchema(Schema):
     metadata: dict[str, Any] | None = Field(None, description=_("Metadata"))
     keywords: list[KeywordSchema] = Field(None, description=_("Keywords"))
     owner: OwnerSchema | None = Field(None, description=_("Owner"))
+    reaction: str | None = Field(None, description=_("Reaction"))
     reactions_summary: PostReactionSummarySchema = Field(..., description=_("Reactions Count"))
     created_at: datetime = Field(..., description=_("Created At"))
     updated_at: datetime = Field(..., description=_("Updated At"))
@@ -103,7 +105,13 @@ class PostMediaFormSchema(Schema):
     model_config = ConfigDict(from_attributes=True)
 
 
-class ReportSchema(Schema):
+class ReactionFormSchema(Schema):
+    type: ReactionTypes | None = Field(None, description=_("Type"))
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PostReportSchema(Schema):
     reason: ReportReasons = Field(..., description=_("Reason"))
     status: ReportStatus = Field(..., description=_("Status"))
     post_uuid: UUID4 = Field(..., alias="post_id", description=_("Post UUID"))
@@ -111,21 +119,13 @@ class ReportSchema(Schema):
     model_config = ConfigDict(from_attributes=True)
 
 
-class ReportFormSchema(Schema):
+class PostReportFormSchema(Schema):
     reason: ReportReasons = Field(..., description=_("Reason"))
-    post_uuid: UUID4 = Field(..., description=_("Post UUID"))
 
     model_config = ConfigDict(from_attributes=True)
 
 
-class ReactionSchema(Schema):
+class ResponseSchema(Schema):
     detail: str = Field(..., description=_("Detail"))
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class ReactionFormSchema(Schema):
-    type: ReactionTypes | None = Field(None, description=_("Type"))
-    post_uuid: UUID4 = Field(..., description=_("Post UUID"))
 
     model_config = ConfigDict(from_attributes=True)

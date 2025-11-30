@@ -8,11 +8,8 @@ from src.apps.posts.enums import (
     POST_STATUS,
     POST_TYPES,
     REACTION_TYPES,
-    REPORT_REASONS,
-    REPORT_STATUS,
     PostStatus,
     ReactionTypes,
-    ReportStatus,
 )
 from src.utils.models import SoftDeleteModel
 from src.utils.upload_file import path_and_rename_media, path_and_rename_thumbnail
@@ -105,43 +102,6 @@ class Owners(models.Model):
         return self.username
 
 
-class Reports(models.Model):
-    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, verbose_name=_("Unique Identifier"))
-    reason = models.CharField(max_length=255, choices=REPORT_REASONS, verbose_name=_("Reason"))
-    status = models.CharField(
-        max_length=255, choices=REPORT_STATUS, default=ReportStatus.PENDING, verbose_name=_("Status")
-    )
-    user = models.ForeignKey(
-        "users.Users",
-        on_delete=models.CASCADE,
-        db_column="user_uuid",
-        related_name="reports",
-        verbose_name=_("User"),
-    )
-    post = models.ForeignKey(
-        "posts.Posts",
-        on_delete=models.CASCADE,
-        db_column="post_uuid",
-        related_name="reports",
-        verbose_name=_("Post"),
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = "reports"
-        verbose_name = _("Report")
-        verbose_name_plural = _("Reports")
-        ordering = ["-created_at"]
-        indexes = [
-            models.Index(fields=["status"]),
-            models.Index(fields=["created_at"]),
-        ]
-
-    def __str__(self):
-        return f"{self.uuid} - {self.reason}"
-
-
 class Reactions(models.Model):
     type = models.CharField(max_length=255, choices=REACTION_TYPES, verbose_name=_("Reaction Type"))
     user = models.ForeignKey(
@@ -173,3 +133,34 @@ class Reactions(models.Model):
 
     def __str__(self):
         return f"{self.uuid} - {self.type}"
+
+
+class Favorites(models.Model):
+    user = models.ForeignKey(
+        "users.Users",
+        on_delete=models.CASCADE,
+        db_column="user_uuid",
+        related_name="favorites",
+        verbose_name=_("User"),
+    )
+    post = models.ForeignKey(
+        "posts.Posts",
+        on_delete=models.CASCADE,
+        db_column="post_uuid",
+        related_name="favorites",
+        verbose_name=_("Post"),
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "favorites"
+        verbose_name = _("Favorite")
+        verbose_name_plural = _("Favorites")
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.uuid}"

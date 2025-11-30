@@ -7,23 +7,25 @@ import requests
 # from config.auth import SupabaseJWTAuth
 from django.core.files.base import ContentFile
 from django.db import transaction
+from django.db.models import OuterRef, Subquery
 from django.shortcuts import get_object_or_404
 from ninja import File, Query, Router, UploadedFile
 from ninja.pagination import LimitOffsetPagination, paginate
 
-from src.apps.posts.enums import PostTypes, ReportStatus
+from src.apps.posts.enums import PostTypes
 from src.apps.posts.filters import PostFilterSchema
-from src.apps.posts.models import Keywords, Owners, Posts, Reactions, Reports
+from src.apps.posts.models import Favorites, Keywords, Owners, Posts, Reactions
 from src.apps.posts.schemas import (
     PostFormSchema,
     PostMediaFormSchema,
+    PostReportFormSchema,
+    PostReportSchema,
     PostSchema,
     PostUpdateFormSchema,
     ReactionFormSchema,
-    ReactionSchema,
-    ReportFormSchema,
-    ReportSchema,
+    ResponseSchema,
 )
+from src.apps.reports.enums import ReportStatus
 from src.integrations.openai import OpenAI
 from src.integrations.postsyncer import Postsyncer
 from src.integrations.postsyncer.schemas import PostsyncerSchema
@@ -40,8 +42,21 @@ router = Router(tags=["Posts"])
     },
 )
 @paginate(LimitOffsetPagination)
-def list(request, filters: PostFilterSchema = Query(...)):
-    queryset = Posts.objects.select_related("owner").prefetch_related("keywords").prefetch_related("reactions")
+def all(request, filters: PostFilterSchema = Query(...)):
+    reaction_subquery = Reactions.objects.filter(
+        post_id=OuterRef("pk"),
+        user_id="afa3c3b8-a5fa-4430-923d-c37f31739094",
+    ).values("type")[:1]
+
+    queryset = (
+        Posts.objects.exclude(reports__status=ReportStatus.APPROVED)
+        .annotate(
+            reaction=Subquery(reaction_subquery),
+        )
+        .select_related("owner")
+        .prefetch_related("keywords")
+        .prefetch_related("reactions")
+    )
     return filters.filter(queryset)
 
 
@@ -261,19 +276,37 @@ def create_media_data(request, payload: PostMediaFormSchema):
         return 201, instance
 
 
-@router.post(
-    "/report",
+@router.delete(
+    "{uuid:uuid}",
     response={
-        201: ReportSchema,
+        200: ResponseSchema,
         500: None,
     },
 )
-def create_report(request, payload: ReportFormSchema):
-    post = Posts.objects.get(uuid=payload.post_uuid)
+def delete(request, uuid: uuid.UUID):
+    instance = Posts.objects.get(uuid=uuid)
+    if not instance:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    instance.delete()
+    return 200, ResponseSchema(
+        detail="Post deleted",
+    )
+
+
+@router.post(
+    "/{uuid:uuid}/report",
+    response={
+        201: PostReportSchema,
+        500: None,
+    },
+)
+def create_report(request, uuid: uuid.UUID, payload: PostReportFormSchema):
+    post = Posts.objects.get(uuid=uuid)
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
-    instance, _ = Reports.objects.get_or_create(
+    instance, _ = post.reports.get_or_create(
         post=post,
         reason=payload.reason,
         status=ReportStatus.PENDING,
@@ -284,14 +317,14 @@ def create_report(request, payload: ReportFormSchema):
 
 
 @router.post(
-    "/reaction",
+    "/{uuid:uuid}/reaction",
     response={
-        200: ReactionSchema,
+        200: ResponseSchema,
         500: None,
     },
 )
-def create_reaction(request, payload: ReactionFormSchema):
-    post = Posts.objects.get(uuid=payload.post_uuid)
+def create_reaction(request, uuid: uuid.UUID, payload: ReactionFormSchema):
+    post = Posts.objects.get(uuid=uuid)
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
@@ -310,6 +343,53 @@ def create_reaction(request, payload: ReactionFormSchema):
             instance.type = payload.type
             instance.save(update_fields=["type"])
 
-    return 200, ReactionSchema(
+    return 200, ResponseSchema(
         detail="Reaction updated",
     )
+
+
+@router.post(
+    "/{uuid:uuid}/favorite",
+    response={
+        200: ResponseSchema,
+        500: None,
+    },
+)
+def create_favorite(request, uuid: uuid.UUID):
+    post = Posts.objects.get(uuid=uuid)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    instance, created = Favorites.objects.get_or_create(
+        post=post,
+        user_id=request.user.id,
+    )
+
+    if not created:
+        instance.delete()
+        return 200, ResponseSchema(
+            detail="Favorite deleted",
+        )
+
+    return 200, ResponseSchema(
+        detail="Favorite created",
+    )
+
+
+@router.get(
+    "favorites",
+    response={
+        200: list[PostSchema],
+        500: None,
+    },
+)
+@paginate(LimitOffsetPagination)
+def favorites(request, filters: PostFilterSchema = Query(...)):
+    queryset = (
+        Posts.objects.exclude(reports__status=ReportStatus.APPROVED)
+        .filter(favorites__user_id=request.user.id)
+        .select_related("owner")
+        .prefetch_related("keywords")
+        .prefetch_related("reactions")
+    )
+    return filters.filter(queryset)

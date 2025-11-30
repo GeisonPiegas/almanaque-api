@@ -23,6 +23,7 @@ __API_PREFIX_V1 = "api/v1"
 
 
 api.add_router(f"{__API_PREFIX_V1}/posts", "src.apps.posts.API.routes.router")
+api.add_router(f"{__API_PREFIX_V1}/reports", "src.apps.reports.API.routes.router")
 
 
 @api.get(
