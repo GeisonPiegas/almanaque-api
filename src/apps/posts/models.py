@@ -3,6 +3,7 @@ import uuid
 
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from pgvector.django import IvfflatIndex, VectorField
 
 from src.apps.posts.enums import (
     POST_STATUS,
@@ -42,8 +43,22 @@ class Posts(SoftDeleteModel):
     external_link = models.URLField(null=True, verbose_name=_("External Link"))
     metadata = models.JSONField(null=True)
     keywords = models.ManyToManyField("posts.Keywords", related_name="posts")
+    embedding = VectorField(dimensions=1536, null=True)
     owner = models.ForeignKey(
-        "posts.Owners", null=True, on_delete=models.CASCADE, related_name="posts", verbose_name=_("Owner")
+        "posts.Owners",
+        null=True,
+        on_delete=models.CASCADE,
+        db_column="owner_uuid",
+        related_name="posts",
+        verbose_name=_("Owner"),
+    )
+    user = models.ForeignKey(
+        "users.Users",
+        null=True,
+        on_delete=models.CASCADE,
+        db_column="user_uuid",
+        related_name="posts",
+        verbose_name=_("User"),
     )
 
     class Meta:
@@ -55,6 +70,12 @@ class Posts(SoftDeleteModel):
             models.Index(fields=["created_at"]),
             models.Index(fields=["type"]),
             models.Index(fields=["status"]),
+            IvfflatIndex(
+                name="post_embedding_ivfflat",
+                fields=["embedding"],
+                lists=100,
+                opclasses=["vector_cosine_ops"],  # para cosine distance
+            ),
         ]
 
     def __str__(self):

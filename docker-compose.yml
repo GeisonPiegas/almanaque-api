@@ -26,18 +26,18 @@ services:
       - internal-net
 
   almanaque-service-database:
-    image: postgres:16
+    image: pgvector/pgvector:pg16
     container_name: almanaque-service-database
     volumes:
-      - postgres_data:/var/lib/postgresql/data/
+      - pgvector_data:/var/lib/postgresql/data
     environment:
-      - POSTGRES_DB=almanaque_bank
+      - POSTGRES_DB=almanaque_db
       - POSTGRES_USER=almanaque_user
       - POSTGRES_PASSWORD=almanaque_password
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U almanaque_user -d almanaque_bank"]
+      test: ["CMD-SHELL", "pg_isready -U almanaque_user -d almanaque_db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -49,4 +49,4 @@ networks:
     external: true
 
 volumes:
-  postgres_data:
+  pgvector_data:

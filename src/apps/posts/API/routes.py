@@ -3,8 +3,7 @@ from http.client import HTTPException
 from typing import cast
 
 import requests
-
-# from config.auth import SupabaseJWTAuth
+from config.auth import SupabaseJWTAuth
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.db.models import OuterRef, Subquery
@@ -12,7 +11,7 @@ from django.shortcuts import get_object_or_404
 from ninja import File, Query, Router, UploadedFile
 from ninja.pagination import LimitOffsetPagination, paginate
 
-from src.apps.posts.enums import PostTypes
+from src.apps.posts.enums import PostStatus, PostTypes
 from src.apps.posts.filters import PostFilterSchema
 from src.apps.posts.models import Favorites, Keywords, Owners, Posts, Reactions
 from src.apps.posts.schemas import (
@@ -30,6 +29,7 @@ from src.integrations.openai import OpenAI
 from src.integrations.postsyncer import Postsyncer
 from src.integrations.postsyncer.schemas import PostsyncerSchema
 from src.utils.movie import generate_video_thumbnail_from_upload
+from src.utils.schemas import AuthenticatedRequest
 
 router = Router(tags=["Posts"])
 
@@ -40,35 +40,43 @@ router = Router(tags=["Posts"])
         200: list[PostSchema],
         500: None,
     },
+    auth=SupabaseJWTAuth(),
 )
 @paginate(LimitOffsetPagination)
-def all(request, filters: PostFilterSchema = Query(...)):
-    reaction_subquery = Reactions.objects.filter(
-        post_id=OuterRef("pk"),
-        user_id="afa3c3b8-a5fa-4430-923d-c37f31739094",
-    ).values("type")[:1]
+def all(request: AuthenticatedRequest, filters: PostFilterSchema = Query(...)):
+    # auth = get_optional_user(request)
 
     queryset = (
         Posts.objects.exclude(reports__status=ReportStatus.APPROVED)
-        .annotate(
-            reaction=Subquery(reaction_subquery),
-        )
         .select_related("owner")
         .prefetch_related("keywords")
         .prefetch_related("reactions")
+        .distinct()
     )
-    return filters.filter(queryset)
+
+    if request.auth.user:
+        reaction_subquery = Reactions.objects.filter(
+            post_id=OuterRef("pk"),
+            user_id=request.auth.user.uuid,
+        ).values("type")[:1]
+
+        queryset = queryset.annotate(
+            reaction=Subquery(reaction_subquery),
+        )
+
+    queryset = filters.filter(queryset)
+    return queryset
 
 
-# auth=SupabaseJWTAuth(),
 @router.post(
     "",
     response={
         201: PostSchema,
         500: None,
     },
+    auth=SupabaseJWTAuth(),
 )
-def create(request, payload: PostFormSchema):
+def create(request: AuthenticatedRequest, payload: PostFormSchema):
     with transaction.atomic():
         postsyncer = Postsyncer()
         social_media_data = postsyncer.get_social_media(payload.url)
@@ -105,7 +113,9 @@ def create(request, payload: PostFormSchema):
             media=media,
             thumbnail=thumbnail,
             type=_type,
+            status=PostStatus.APPROVED.value,
             owner=owner,
+            user_id=request.auth.user.uuid,
             provider=social_media_data.get("source"),
             external_link=social_media_data.get("url"),
         )
@@ -121,6 +131,7 @@ def create(request, payload: PostFormSchema):
 
             instance.title = _openai.get("title")
             instance.description = _openai.get("description")
+            instance.embedding = openai.get_embedding(instance.description)
             instance.keywords.set(keywords)
             instance.save()
         except Exception as e:
@@ -135,11 +146,18 @@ def create(request, payload: PostFormSchema):
         201: PostSchema,
         500: None,
     },
+    auth=SupabaseJWTAuth(),
 )
-def update(request, uuid: uuid.UUID, payload: PostUpdateFormSchema):
-    instance = get_object_or_404(Posts, uuid=uuid)
+def update(request: AuthenticatedRequest, uuid: uuid.UUID, payload: PostUpdateFormSchema):
+    instance = get_object_or_404(Posts, uuid=uuid, user_id=request.auth.user.uuid)
     instance.title = payload.title
     instance.description = payload.description
+
+    try:
+        openai = OpenAI()
+        instance.embedding = openai.get_embedding(instance.description)
+    except Exception as e:
+        print(f"Error OpenAI: {e}")
 
     keywords = []
     for keyword in payload.keywords:
@@ -157,7 +175,7 @@ def update(request, uuid: uuid.UUID, payload: PostUpdateFormSchema):
         500: None,
     },
 )
-def create_media(request, media: UploadedFile = File(...)):
+def create_media(request: AuthenticatedRequest, media: UploadedFile = File(...)):
     max_size = 1024 * 1024 * 5
     extensions = ["jpg", "jpeg", "png", "gif", "mp4"]
     extension = media.content_type.split("/")[1]
@@ -172,6 +190,8 @@ def create_media(request, media: UploadedFile = File(...)):
         instance = Posts.objects.create(
             media=media,
             type=PostTypes.IMAGE.value,
+            status=PostStatus.APPROVED.value,
+            user_id=request.auth.user.uuid,
         )
 
         if extension == "mp4":
@@ -191,6 +211,7 @@ def create_media(request, media: UploadedFile = File(...)):
 
             instance.title = _openai.get("title")
             instance.description = _openai.get("description")
+            instance.embedding = openai.get_embedding(instance.description)
             instance.keywords.set(keywords)
             instance.save()
         except Exception as e:
@@ -206,7 +227,7 @@ def create_media(request, media: UploadedFile = File(...)):
         500: None,
     },
 )
-def get_social_media(request, payload: PostFormSchema):
+def get_social_media(request: AuthenticatedRequest, payload: PostFormSchema):
     postsyncer = Postsyncer()
     social_media_data = postsyncer.get_social_media(payload.url)
     instance = PostsyncerSchema.model_validate(social_media_data)
@@ -220,7 +241,7 @@ def get_social_media(request, payload: PostFormSchema):
         500: None,
     },
 )
-def create_media_data(request, payload: PostMediaFormSchema):
+def create_media_data(request: AuthenticatedRequest, payload: PostMediaFormSchema):
     with transaction.atomic():
         owner = None
 
@@ -252,7 +273,9 @@ def create_media_data(request, payload: PostMediaFormSchema):
             media=media,
             thumbnail=thumbnail,
             type=_type,
+            status=PostStatus.APPROVED.value,
             owner=owner,
+            user_id=request.auth.user.uuid,
             provider=media.source,
             external_link=media.url,
         )
@@ -268,6 +291,7 @@ def create_media_data(request, payload: PostMediaFormSchema):
 
             instance.title = _openai.get("title")
             instance.description = _openai.get("description")
+            instance.embedding = openai.get_embedding(instance.description)
             instance.keywords.set(keywords)
             instance.save()
         except Exception as e:
@@ -282,8 +306,9 @@ def create_media_data(request, payload: PostMediaFormSchema):
         200: ResponseSchema,
         500: None,
     },
+    auth=SupabaseJWTAuth(),
 )
-def delete(request, uuid: uuid.UUID):
+def delete(request: AuthenticatedRequest, uuid: uuid.UUID):
     instance = Posts.objects.get(uuid=uuid)
     if not instance:
         raise HTTPException(status_code=404, detail="Post not found")
@@ -300,8 +325,9 @@ def delete(request, uuid: uuid.UUID):
         201: PostReportSchema,
         500: None,
     },
+    auth=SupabaseJWTAuth(),
 )
-def create_report(request, uuid: uuid.UUID, payload: PostReportFormSchema):
+def create_report(request: AuthenticatedRequest, uuid: uuid.UUID, payload: PostReportFormSchema):
     post = Posts.objects.get(uuid=uuid)
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
@@ -310,7 +336,7 @@ def create_report(request, uuid: uuid.UUID, payload: PostReportFormSchema):
         post=post,
         reason=payload.reason,
         status=ReportStatus.PENDING,
-        user_id=request.user.id,
+        user_id=request.auth.user.uuid,
     )
 
     return 201, instance
@@ -322,15 +348,16 @@ def create_report(request, uuid: uuid.UUID, payload: PostReportFormSchema):
         200: ResponseSchema,
         500: None,
     },
+    auth=SupabaseJWTAuth(),
 )
-def create_reaction(request, uuid: uuid.UUID, payload: ReactionFormSchema):
+def create_reaction(request: AuthenticatedRequest, uuid: uuid.UUID, payload: ReactionFormSchema):
     post = Posts.objects.get(uuid=uuid)
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
     instance, created = Reactions.objects.get_or_create(
         post=post,
-        user_id=request.user.id,
+        user_id=request.auth.user.uuid,
         defaults={
             "type": payload.type,
         },
@@ -354,15 +381,16 @@ def create_reaction(request, uuid: uuid.UUID, payload: ReactionFormSchema):
         200: ResponseSchema,
         500: None,
     },
+    auth=SupabaseJWTAuth(),
 )
-def create_favorite(request, uuid: uuid.UUID):
+def create_favorite(request: AuthenticatedRequest, uuid: uuid.UUID):
     post = Posts.objects.get(uuid=uuid)
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
     instance, created = Favorites.objects.get_or_create(
         post=post,
-        user_id=request.user.id,
+        user_id=request.auth.user.uuid,
     )
 
     if not created:
@@ -382,12 +410,13 @@ def create_favorite(request, uuid: uuid.UUID):
         200: list[PostSchema],
         500: None,
     },
+    auth=SupabaseJWTAuth(),
 )
 @paginate(LimitOffsetPagination)
-def favorites(request, filters: PostFilterSchema = Query(...)):
+def favorites(request: AuthenticatedRequest, filters: PostFilterSchema = Query(...)):
     queryset = (
         Posts.objects.exclude(reports__status=ReportStatus.APPROVED)
-        .filter(favorites__user_id=request.user.id)
+        .filter(favorites__user_id=request.auth.user.uuid)
         .select_related("owner")
         .prefetch_related("keywords")
         .prefetch_related("reactions")

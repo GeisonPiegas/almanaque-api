@@ -66,3 +66,10 @@ class OpenAI:
         except Exception as e:
             print(f"Ocorreu um erro inesperado: {e}")
             raise
+
+    def get_embedding(self, text: str) -> list[float]:
+        response = self.client.embeddings.create(
+            model="text-embedding-3-small",
+            input=text,
+        )
+        return response.data[0].embedding

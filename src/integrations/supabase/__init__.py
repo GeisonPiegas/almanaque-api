@@ -4,20 +4,14 @@ from datetime import datetime, timezone
 import jwt
 from jwt import InvalidTokenError
 
+from src.apps.users.services import get_user
+from src.utils.schemas import AuthSchema, AuthUserSchema
+
 SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET")
 SUPABASE_JWT_AUDIENCE = os.environ.get("SUPABASE_JWT_AUDIENCE", "authenticated")
 
 
-class SupabaseUser:
-    def __init__(self, user_id: str, raw_claims: dict):
-        self.id = user_id
-        self.claims = raw_claims
-
-    def __repr__(self):
-        return f"<SupabaseUser id={self.id}>"
-
-
-def verify_supabase_token(token: str) -> SupabaseUser | None:
+def verify_supabase_token(token: str) -> AuthSchema | None:
     """
     Valida o JWT emitido pelo Supabase.
     Retorna SupabaseUser se ok, ou None se inválido.
@@ -48,4 +42,9 @@ def verify_supabase_token(token: str) -> SupabaseUser | None:
     if not user_id:
         return None
 
-    return SupabaseUser(user_id=user_id, raw_claims=payload)
+    user = get_user(user_id)
+    user_auth = None
+    if user:
+        user_auth = AuthUserSchema(uuid=user.uuid, name=user.name)
+
+    return AuthSchema(user=user_auth)

@@ -1,12 +1,14 @@
 # from config.auth import SupabaseJWTAuth
 import uuid
 
+from config.auth import SupabaseJWTAuth
 from django.shortcuts import get_object_or_404
 from ninja import Router
 from ninja.pagination import LimitOffsetPagination, paginate
 from src.apps.reports.enums import ReportStatus
 from src.apps.reports.models import Reports
 from src.apps.reports.schemas import ReportSchema
+from src.utils.schemas import AuthenticatedRequest
 
 router = Router(tags=["Reports"])
 
@@ -17,9 +19,10 @@ router = Router(tags=["Reports"])
         200: list[ReportSchema],
         500: None,
     },
+    auth=SupabaseJWTAuth(),
 )
 @paginate(LimitOffsetPagination)
-def list(request):
+def list(request: AuthenticatedRequest):
     queryset = Reports.objects.select_related("post").all()
     return queryset
 
@@ -30,8 +33,9 @@ def list(request):
         200: ReportSchema,
         500: None,
     },
+    auth=SupabaseJWTAuth(),
 )
-def approval(request, uuid: uuid.UUID):
+def approval(request: AuthenticatedRequest, uuid: uuid.UUID):
     instance = get_object_or_404(Reports, uuid=uuid)
     instance.status = ReportStatus.APPROVED
     instance.save(update_fields=["status"])
@@ -44,8 +48,9 @@ def approval(request, uuid: uuid.UUID):
         200: ReportSchema,
         500: None,
     },
+    auth=SupabaseJWTAuth(),
 )
-def reject(request, uuid: uuid.UUID):
+def reject(request: AuthenticatedRequest, uuid: uuid.UUID):
     instance = get_object_or_404(Reports, uuid=uuid)
     instance.status = ReportStatus.REJECTED
     instance.save(update_fields=["status"])

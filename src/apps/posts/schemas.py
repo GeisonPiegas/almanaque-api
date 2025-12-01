@@ -16,11 +16,18 @@ class KeywordSchema(Schema):
     model_config = ConfigDict(from_attributes=True)
 
 
-class OwnerSchema(Schema):
+class PostOwnerSchema(Schema):
     id: int = Field(..., description=_("Unique Identifier"))
     username: str = Field(..., description=_("Username"))
     name: str = Field(..., description=_("Full Name"))
     is_verified: bool = Field(..., description=_("Is Verified"))
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PostUserSchema(Schema):
+    uuid: UUID4 = Field(..., description=_("Unique Identifier"))
+    name: str = Field(..., description=_("Name"))
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -49,9 +56,11 @@ class PostSchema(Schema):
     external_link: str | None = Field(None, description=_("External Link"))
     metadata: dict[str, Any] | None = Field(None, description=_("Metadata"))
     keywords: list[KeywordSchema] = Field(None, description=_("Keywords"))
-    owner: OwnerSchema | None = Field(None, description=_("Owner"))
+    owner: PostOwnerSchema | None = Field(None, description=_("Owner"))
+    user: PostUserSchema | None = Field(None, description=_("User"))
     reaction: str | None = Field(None, description=_("Reaction"))
     reactions_summary: PostReactionSummarySchema = Field(..., description=_("Reactions Count"))
+    distance: float | None = Field(None, description=_("Distance"))
     created_at: datetime = Field(..., description=_("Created At"))
     updated_at: datetime = Field(..., description=_("Updated At"))
 
@@ -82,7 +91,7 @@ class PostMediaSchema(Schema):
     model_config = ConfigDict(from_attributes=True)
 
 
-class PostOwnerSchema(Schema):
+class PostMediaOwnerSchema(Schema):
     id: int = Field(..., description=_("ID"))
     username: str = Field(..., description=_("Username"))
     profile_pic_url: str | None = Field(None, description=_("Profile Picture URL"))
@@ -98,7 +107,7 @@ class PostMediaFormSchema(Schema):
     author: str | None = Field(None, description=_("Author"))
     title: str | None = Field(None, description=_("Title"))
     thumbnail: str = Field(None, description=_("Thumbnail"))
-    owner: PostOwnerSchema | None = Field(None, description=_("Owner"))
+    owner: PostMediaOwnerSchema | None = Field(None, description=_("Owner"))
     media: PostMediaSchema = Field(..., description=_("Media"))
     type: str = Field(..., description=_("Type"))
 
