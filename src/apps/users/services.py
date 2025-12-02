@@ -1,14 +1,11 @@
 from src.apps.users.models import Users
 
 
-def get_user(id: str):
-    instance = Users.objects.filter(external_id=id).first()
-
-    if instance:
-        return instance
-    else:
-        instance = Users.objects.create(
-            name="Usuário",
-            external_id=id,
-        )
-        return instance
+def get_user(id: str, name: str):
+    instance, _ = Users.objects.get_or_create(
+        external_id=id,
+        defaults={
+            "name": name,
+        },
+    )
+    return instance

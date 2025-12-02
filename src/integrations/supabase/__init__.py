@@ -1,7 +1,8 @@
 import os
-from datetime import datetime, timezone
+from datetime import datetime
 
 import jwt
+from django.utils.timezone import timezone
 from jwt import InvalidTokenError
 
 from src.apps.users.services import get_user
@@ -23,26 +24,24 @@ def verify_supabase_token(token: str) -> AuthSchema | None:
         payload = jwt.decode(
             token,
             SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],  # Supabase antigo usa HS256 com JWT_SECRET
-            audience=SUPABASE_JWT_AUDIENCE,  # se não usar 'aud', pode remover
-            options={"verify_aud": False},  # desliga se seu token não tiver 'aud'
+            algorithms=["HS256"],
+            audience=SUPABASE_JWT_AUDIENCE,
+            options={"verify_aud": False},
         )
-    except InvalidTokenError:
+    except InvalidTokenError as e:
         return None
 
-    # Verificação de expiração manual (se quiser garantir)
     exp = payload.get("exp")
     if exp is not None:
-        now = datetime.now(timezone.UTC).timestamp()
+        now = datetime.now(timezone.utc).timestamp()
         if now > exp:
             return None
 
-    # No Supabase, normalmente o ID do user está em 'sub'
     user_id = payload.get("sub")
     if not user_id:
         return None
 
-    user = get_user(user_id)
+    user = get_user(user_id, payload.get("user_metadata", {}).get("full_name"))
     user_auth = None
     if user:
         user_auth = AuthUserSchema(uuid=user.uuid, name=user.name)

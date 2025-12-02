@@ -3,7 +3,7 @@ from http.client import HTTPException
 from typing import cast
 
 import requests
-from config.auth import SupabaseJWTAuth
+from config.auth import SupabaseJWTAuth, get_optional_user
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.db.models import OuterRef, Subquery
@@ -41,11 +41,10 @@ router = Router(tags=["Posts"])
         200: list[PostSchema],
         500: None,
     },
-    auth=SupabaseJWTAuth(),
 )
 @paginate(LimitOffsetPagination)
 def all(request: AuthenticatedRequest, filters: PostFilterSchema = Query(...)):
-    # auth = get_optional_user(request)
+    auth = get_optional_user(request)
 
     queryset = (
         Posts.objects.exclude(reports__status=ReportStatus.APPROVED)
@@ -55,10 +54,10 @@ def all(request: AuthenticatedRequest, filters: PostFilterSchema = Query(...)):
         .distinct()
     )
 
-    if request.auth.user:
+    if auth:
         reaction_subquery = Reactions.objects.filter(
             post_id=OuterRef("pk"),
-            user_id=request.auth.user.uuid,
+            user_id=auth.user.uuid,
         ).values("type")[:1]
 
         queryset = queryset.annotate(
@@ -178,6 +177,7 @@ def update(request: AuthenticatedRequest, uuid: uuid.UUID, payload: PostUpdateFo
         201: PostSchema,
         500: None,
     },
+    auth=SupabaseJWTAuth(),
 )
 def create_media(request: AuthenticatedRequest, media: UploadedFile = File(...)):
     max_size = 1024 * 1024 * 5
@@ -245,6 +245,7 @@ def get_social_media(request: AuthenticatedRequest, payload: PostFormSchema):
         201: PostSchema,
         500: None,
     },
+    auth=SupabaseJWTAuth(),
 )
 def create_media_data(request: AuthenticatedRequest, payload: PostMediaFormSchema):
     with transaction.atomic():
@@ -315,7 +316,7 @@ def create_media_data(request: AuthenticatedRequest, payload: PostMediaFormSchem
     auth=SupabaseJWTAuth(),
 )
 def delete(request: AuthenticatedRequest, uuid: uuid.UUID):
-    instance = Posts.objects.get(uuid=uuid)
+    instance = Posts.objects.get(uuid=uuid, user_id=request.auth.user.uuid)
     if not instance:
         raise HTTPException(status_code=404, detail="Post not found")
 

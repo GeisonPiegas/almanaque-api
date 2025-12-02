@@ -1,21 +1,6 @@
-from abc import ABC, abstractmethod
-
-from django.http import HttpRequest
-from ninja.security.http import HttpAuthBase
+from ninja.security.http import HttpBearer
 from src.integrations.supabase import verify_supabase_token
-from src.utils.schemas import AuthSchema, AuthUserSchema
-
-
-class HttpBearer(HttpAuthBase, ABC):
-    openapi_scheme: str = "bearer"
-    header: str = "Authorization"
-
-    def __call__(self, request: HttpRequest):
-        return self.authenticate(request, "")
-
-    @abstractmethod
-    def authenticate(self, request: HttpRequest, token: str):
-        pass
+from src.utils.schemas import AuthSchema
 
 
 class SupabaseJWTAuth(HttpBearer):
@@ -24,8 +9,7 @@ class SupabaseJWTAuth(HttpBearer):
         Retorna um SupabaseUser se o token for válido, ou None se inválido.
         Se None -> Ninja retorna 401 automaticamente.
         """
-        auth = AuthSchema(user=AuthUserSchema(uuid="afa3c3b8-a5fa-4430-923d-c37f31739094", name="John Doe"))
-        return auth
+        return verify_supabase_token(token)
 
 
 def get_optional_user(request) -> AuthSchema | None:
