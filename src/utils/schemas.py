@@ -5,7 +5,7 @@ from requests import Request
 
 class AuthUserSchema(BaseModel):
     uuid: UUID4 = Field(..., description=_("Unique identifier"))
-    name: str = Field(..., max_length=255, title=_("Name/Business Name"))
+    name: str | None = Field(None, max_length=255, title=_("Name"))
 
 
 class AuthSchema(BaseModel):

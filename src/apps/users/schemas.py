@@ -5,6 +5,6 @@ from pydantic import UUID4, ConfigDict
 
 class UserSchema(Schema):
     uuid: UUID4 = Field(..., description=_("Unique Identifier"))
-    name: str = Field(..., description=_("Name"))
+    name: str | None = Field(None, description=_("Name"))
 
     model_config = ConfigDict(from_attributes=True)

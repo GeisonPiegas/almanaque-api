@@ -41,7 +41,7 @@ def verify_supabase_token(token: str) -> AuthSchema | None:
     if not user_id:
         return None
 
-    user = get_user(user_id, payload.get("user_metadata", {}).get("full_name"))
+    user = get_user(user_id, payload.get("user_metadata", {}).get("full_name", None))
     user_auth = None
     if user:
         user_auth = AuthUserSchema(uuid=user.uuid, name=user.name)

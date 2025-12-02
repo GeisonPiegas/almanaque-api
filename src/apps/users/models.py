@@ -6,7 +6,7 @@ from django.utils.translation import gettext_lazy as _
 
 class Users(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=255, verbose_name=_("Name"))
+    name = models.CharField(max_length=255, null=True, verbose_name=_("Name"))
     external_id = models.CharField(max_length=255, verbose_name=_("External ID"))
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
