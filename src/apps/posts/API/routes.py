@@ -25,9 +25,10 @@ from src.apps.posts.schemas import (
     ResponseSchema,
 )
 from src.apps.reports.enums import ReportStatus
-from src.integrations.openai import OpenAI
+from src.integrations.ai import AlmanaqueAI
 from src.integrations.postsyncer import Postsyncer
 from src.integrations.postsyncer.schemas import PostsyncerSchema
+from src.utils.async_func_retry import retry
 from src.utils.movie import generate_video_thumbnail_from_upload
 from src.utils.schemas import AuthenticatedRequest
 
@@ -79,7 +80,7 @@ def all(request: AuthenticatedRequest, filters: PostFilterSchema = Query(...)):
 def create(request: AuthenticatedRequest, payload: PostFormSchema):
     with transaction.atomic():
         postsyncer = Postsyncer()
-        social_media_data = postsyncer.get_social_media(payload.url)
+        social_media_data = retry(postsyncer.get_social_media, payload.url)
 
         owner = None
         social_media_owner = social_media_data.get("owner")
@@ -120,22 +121,24 @@ def create(request: AuthenticatedRequest, payload: PostFormSchema):
             external_link=social_media_data.get("url"),
         )
 
+        almanaque_ai = AlmanaqueAI()
+
         try:
-            openai = OpenAI()
-            _openai = openai.process_image(instance.media_to_base64())
+            data = almanaque_ai.process_image(instance.media_to_base64())
 
             keywords = []
-            for keyword in _openai.get("keywords", []):
+            for keyword in data.get("keywords", []):
                 _keyword, _ = Keywords.objects.get_or_create(name=keyword.upper())
                 keywords.append(_keyword)
 
-            instance.title = _openai.get("title")
-            instance.description = _openai.get("description")
-            instance.embedding = openai.get_embedding(instance.description)
+            instance.title = data.get("title")
+            instance.description = data.get("description")
+            instance.embedding = almanaque_ai.get_embedding(instance.description)
             instance.keywords.set(keywords)
-            instance.save()
-        except Exception as e:
-            print(f"Error OpenAI: {e}")
+        except Exception:
+            raise HTTPException(status_code=400, detail="The file could not be processed")
+
+        instance.save()
 
         return 201, instance
 
@@ -153,11 +156,12 @@ def update(request: AuthenticatedRequest, uuid: uuid.UUID, payload: PostUpdateFo
     instance.title = payload.title
     instance.description = payload.description
 
+    almanaque_ai = AlmanaqueAI()
+
     try:
-        openai = OpenAI()
-        instance.embedding = openai.get_embedding(instance.description)
+        instance.embedding = almanaque_ai.get_embedding(instance.description)
     except Exception as e:
-        print(f"Error OpenAI: {e}")
+        print(f"Error embedding failed: {e}")
 
     keywords = []
     for keyword in payload.keywords:
@@ -200,22 +204,23 @@ def create_media(request: AuthenticatedRequest, media: UploadedFile = File(...))
             instance.type = PostTypes.VIDEO.value
             instance.save()
 
+        almanaque_ai = AlmanaqueAI()
+
         try:
-            openai = OpenAI()
-            _openai = openai.process_image(instance.media_to_base64())
+            data = almanaque_ai.process_image(instance.media_to_base64())
 
             keywords = []
-            for keyword in _openai.get("keywords", []):
+            for keyword in data.get("keywords", []):
                 _keyword, _ = Keywords.objects.get_or_create(name=keyword.upper())
                 keywords.append(_keyword)
 
-            instance.title = _openai.get("title")
-            instance.description = _openai.get("description")
-            instance.embedding = openai.get_embedding(instance.description)
+            instance.title = data.get("title")
+            instance.description = data.get("description")
+            instance.embedding = almanaque_ai.get_embedding(instance.description)
             instance.keywords.set(keywords)
             instance.save()
-        except Exception as e:
-            print(f"Error OpenAI: {e}")
+        except Exception:
+            raise HTTPException(status_code=400, detail="The file could not be processed")
 
         return 201, instance
 
@@ -229,7 +234,7 @@ def create_media(request: AuthenticatedRequest, media: UploadedFile = File(...))
 )
 def get_social_media(request: AuthenticatedRequest, payload: PostFormSchema):
     postsyncer = Postsyncer()
-    social_media_data = postsyncer.get_social_media(payload.url)
+    social_media_data = retry(postsyncer.get_social_media, payload.url)
     instance = PostsyncerSchema.model_validate(social_media_data)
     return 200, instance
 
@@ -280,22 +285,23 @@ def create_media_data(request: AuthenticatedRequest, payload: PostMediaFormSchem
             external_link=media.url,
         )
 
+        almanaque_ai = AlmanaqueAI()
+
         try:
-            openai = OpenAI()
-            _openai = openai.process_image(instance.media_to_base64())
+            data = almanaque_ai.process_image(instance.media_to_base64())
 
             keywords = []
-            for keyword in _openai.get("keywords", []):
+            for keyword in data.get("keywords", []):
                 _keyword, _ = Keywords.objects.get_or_create(name=keyword.upper())
                 keywords.append(_keyword)
 
-            instance.title = _openai.get("title")
-            instance.description = _openai.get("description")
-            instance.embedding = openai.get_embedding(instance.description)
+            instance.title = data.get("title")
+            instance.description = data.get("description")
+            instance.embedding = almanaque_ai.get_embedding(instance.description)
             instance.keywords.set(keywords)
             instance.save()
-        except Exception as e:
-            print(f"Error OpenAI: {e}")
+        except Exception:
+            raise HTTPException(status_code=400, detail="The file could not be processed")
 
         return 201, instance
 

@@ -17,10 +17,8 @@ class OpenAI:
             )
         self.client = openai.OpenAI(api_key=self.api_key)
 
-    def process_image(self, image_path: str) -> dict[str, any]:
+    def process_image(self, base64_image: str) -> dict[str, any]:
         try:
-            base64_image = image_path
-
             prompt_messages = [
                 {
                     "role": "user",
