@@ -18,8 +18,8 @@ class KeywordSchema(Schema):
 
 class PostOwnerSchema(Schema):
     id: int = Field(..., description=_("Unique Identifier"))
-    username: str = Field(..., description=_("Username"))
-    name: str = Field(..., description=_("Full Name"))
+    username: str | None = Field(None, description=_("Username"))
+    name: str | None = Field(None, description=_("Full Name"))
     is_verified: bool = Field(..., description=_("Is Verified"))
 
     model_config = ConfigDict(from_attributes=True)
@@ -27,7 +27,7 @@ class PostOwnerSchema(Schema):
 
 class PostUserSchema(Schema):
     uuid: UUID4 = Field(..., description=_("Unique Identifier"))
-    name: str = Field(..., description=_("Name"))
+    name: str | None = Field(None, description=_("Name"))
 
     model_config = ConfigDict(from_attributes=True)
 
