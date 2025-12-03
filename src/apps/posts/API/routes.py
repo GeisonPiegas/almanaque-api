@@ -25,10 +25,10 @@ from src.apps.posts.schemas import (
     ResponseSchema,
 )
 from src.apps.reports.enums import ReportStatus
-from src.integrations.ai import AlmanaqueAI
+from src.integrations.almanaque_ai import AlmanaqueAI
 from src.integrations.postsyncer import Postsyncer
 from src.integrations.postsyncer.schemas import PostsyncerSchema
-from src.utils.async_func_retry import retry
+from src.utils.func_retry import retry
 from src.utils.movie import generate_video_thumbnail_from_upload
 from src.utils.schemas import AuthenticatedRequest
 

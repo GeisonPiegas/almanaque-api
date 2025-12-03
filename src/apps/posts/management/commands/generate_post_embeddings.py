@@ -5,14 +5,14 @@ from src.integrations.openai import OpenAI
 
 
 class Command(BaseCommand):
-    help = "Gera embeddings para os posts que ainda não têm embedding"
+    help = "Generates embeddings for posts that don't already have embeddings."
 
     def handle(self, *args, **options):
         queryset = Posts.objects.filter(embedding__isnull=True)
 
         total = queryset.count()
         openai = OpenAI()
-        self.stdout.write(f"Gerando embeddings para {total} posts...")
+        self.stdout.write(f"Generating embeddings for {total} posts...")
 
         for post in queryset:
             if not post.description:
@@ -22,4 +22,4 @@ class Command(BaseCommand):
             post.embedding = embedding
             post.save(update_fields=["embedding"])
 
-        self.stdout.write(self.style.SUCCESS("Concluído!"))
+        self.stdout.write(self.style.SUCCESS("Completed!"))

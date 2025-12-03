@@ -25,9 +25,16 @@ class OpenAI:
                     "content": [
                         {
                             "type": "text",
-                            "text": "Analise esta imagem e gere um título, uma descrição e uma lista de palavras-chave relevantes. "
-                            "Retorne a resposta estritamente no seguinte formato JSON, sem nenhum texto adicional antes ou depois: "
-                            '{"title": "seu_titulo", "description": "sua_descricao", "keywords": ["palavra1", "palavra2", "palavra3"]}',
+                            "text": (
+                                "Analyze the image (meme). "
+                                "Identify which meme it is (if it is a famous one), describe what is happening visually "
+                                "and generate tags for search. "
+                                "Answer only in JSON, with the fields: "
+                                "`title` (a short, catchy title in Portuguese), "
+                                "`description` (a concise description of what happens in the meme, in Portuguese), and "
+                                "`keywords` (a list of 5 to 10 keywords in Portuguese, including emotions, objects, famous names, and one vibe tag such as "
+                                '"Engraçado", "Irônico", "Triste", "Fofo", etc.).'
+                            ),
                         },
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}},
                     ],
