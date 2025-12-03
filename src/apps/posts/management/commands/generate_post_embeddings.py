@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 
 from src.apps.posts.models import Posts
-from src.integrations.openai import OpenAI
+from src.integrations.almanaque_ai import AlmanaqueAI
 
 
 class Command(BaseCommand):
@@ -11,14 +11,14 @@ class Command(BaseCommand):
         queryset = Posts.objects.filter(embedding__isnull=True)
 
         total = queryset.count()
-        openai = OpenAI()
+        almanaque_ai = AlmanaqueAI()
         self.stdout.write(f"Generating embeddings for {total} posts...")
 
         for post in queryset:
             if not post.description:
                 continue
 
-            embedding = openai.get_embedding(post.description)
+            embedding = almanaque_ai.get_embedding(post.description)
             post.embedding = embedding
             post.save(update_fields=["embedding"])
 
