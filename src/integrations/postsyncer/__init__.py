@@ -9,6 +9,9 @@ class Postsyncer:
         payload = {"url": url, "platform": "all"}
         response = requests.post(self.base_url, json=payload)
         if response.status_code == 200:
-            return response.json()
+            data = response.json()
+            if data.get("error", False):
+                raise Exception(data.get("message", "Unknown error"))
+            return data
         else:
             raise Exception(f"Failed to fetch data from {url}")

@@ -1,5 +1,4 @@
 import uuid
-from http.client import HTTPException
 from typing import cast
 
 import requests
@@ -9,6 +8,7 @@ from django.db import transaction
 from django.db.models import OuterRef, Subquery
 from django.shortcuts import get_object_or_404
 from ninja import File, Query, Router, UploadedFile
+from ninja.errors import HttpError
 from ninja.pagination import LimitOffsetPagination, paginate
 
 from src.apps.posts.enums import PostStatus, PostTypes
@@ -48,9 +48,8 @@ def all(request: AuthenticatedRequest, filters: PostFilterSchema = Query(...)):
 
     queryset = (
         Posts.objects.exclude(reports__status=ReportStatus.APPROVED)
-        .select_related("owner")
-        .prefetch_related("keywords")
-        .prefetch_related("reactions")
+        .select_related("owner", "user")
+        .prefetch_related("keywords", "reactions")
         .distinct()
     )
 
@@ -135,7 +134,7 @@ def create(request: AuthenticatedRequest, payload: PostFormSchema):
             instance.embedding = almanaque_ai.get_embedding(instance.description)
             instance.keywords.set(keywords)
         except Exception:
-            raise HTTPException(status_code=400, detail="The file could not be processed")
+            raise HttpError(400, "The file could not be processed")
 
         instance.save()
 
@@ -185,10 +184,10 @@ def create_media(request: AuthenticatedRequest, media: UploadedFile = File(...))
     extension = media.content_type.split("/")[1]
 
     if extension not in extensions:
-        raise HTTPException(status_code=400, detail="Invalid media type, possible types jpg, jpeg, png, gif, mp4")
+        raise HttpError(400, "Invalid media type, possible types jpg, jpeg, png, gif, mp4")
 
     if cast(int, media.size) > max_size:
-        raise HTTPException(status_code=400, detail="File size exceeds limit 5MB")
+        raise HttpError(400, "File size exceeds limit 5MB")
 
     with transaction.atomic():
         instance = Posts.objects.create(
@@ -220,7 +219,7 @@ def create_media(request: AuthenticatedRequest, media: UploadedFile = File(...))
             instance.keywords.set(keywords)
             instance.save()
         except Exception:
-            raise HTTPException(status_code=400, detail="The file could not be processed")
+            raise HttpError(400, "The file could not be processed")
 
         return 201, instance
 
@@ -234,9 +233,12 @@ def create_media(request: AuthenticatedRequest, media: UploadedFile = File(...))
 )
 def get_social_media(request: AuthenticatedRequest, payload: PostFormSchema):
     postsyncer = Postsyncer()
-    social_media_data = retry(postsyncer.get_social_media, payload.url)
-    instance = PostsyncerSchema.model_validate(social_media_data)
-    return 200, instance
+    try:
+        social_media_data = retry(postsyncer.get_social_media, payload.url)
+        instance = PostsyncerSchema.model_validate(social_media_data)
+        return 200, instance
+    except Exception:
+        raise HttpError(400, "Failed to fetch social media data")
 
 
 @router.post(
@@ -302,7 +304,7 @@ def create_media_data(request: AuthenticatedRequest, payload: PostMediaFormSchem
             instance.keywords.set(keywords)
             instance.save()
         except Exception:
-            raise HTTPException(status_code=400, detail="The file could not be processed")
+            raise HttpError(400, "The file could not be processed")
 
         return 201, instance
 
@@ -318,7 +320,7 @@ def create_media_data(request: AuthenticatedRequest, payload: PostMediaFormSchem
 def delete(request: AuthenticatedRequest, uuid: uuid.UUID):
     instance = Posts.objects.get(uuid=uuid, user_id=request.auth.user.uuid)
     if not instance:
-        raise HTTPException(status_code=404, detail="Post not found")
+        raise HttpError(404, "Post not found")
 
     instance.delete()
     return 200, ResponseSchema(
@@ -337,7 +339,7 @@ def delete(request: AuthenticatedRequest, uuid: uuid.UUID):
 def create_report(request: AuthenticatedRequest, uuid: uuid.UUID, payload: PostReportFormSchema):
     post = Posts.objects.get(uuid=uuid)
     if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
+        raise HttpError(404, "Post not found")
 
     instance, _ = post.reports.get_or_create(
         post=post,
@@ -360,7 +362,7 @@ def create_report(request: AuthenticatedRequest, uuid: uuid.UUID, payload: PostR
 def create_reaction(request: AuthenticatedRequest, uuid: uuid.UUID, payload: ReactionFormSchema):
     post = Posts.objects.get(uuid=uuid)
     if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
+        raise HttpError(404, "Post not found")
 
     instance, created = Reactions.objects.get_or_create(
         post=post,
@@ -393,7 +395,7 @@ def create_reaction(request: AuthenticatedRequest, uuid: uuid.UUID, payload: Rea
 def create_favorite(request: AuthenticatedRequest, uuid: uuid.UUID):
     post = Posts.objects.get(uuid=uuid)
     if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
+        raise HttpError(404, "Post not found")
 
     instance, created = Favorites.objects.get_or_create(
         post=post,
@@ -424,8 +426,7 @@ def favorites(request: AuthenticatedRequest, filters: PostFilterSchema = Query(.
     queryset = (
         Posts.objects.exclude(reports__status=ReportStatus.APPROVED)
         .filter(favorites__user_id=request.auth.user.uuid)
-        .select_related("owner")
-        .prefetch_related("keywords")
-        .prefetch_related("reactions")
+        .select_related("owner", "user")
+        .prefetch_related("keywords", "reactions")
     )
     return filters.filter(queryset)
