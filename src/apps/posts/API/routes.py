@@ -82,7 +82,8 @@ def recommended(request: AuthenticatedRequest):
     user = Users.objects.get(uuid=request.auth.user.uuid)
     queryset = (
         Posts.objects.exclude(reports__status=ReportStatus.APPROVED)
-        .exclude(embedding=None, reactions__user_id=user.uuid)
+        .exclude(embedding=None)
+        .exclude(reactions__user_id=user.uuid)
         .select_related("owner", "user")
         .prefetch_related("keywords", "reactions")
         .annotate(distance=CosineDistance("embedding", user.preferences_embedding))
