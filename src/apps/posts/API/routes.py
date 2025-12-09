@@ -10,6 +10,7 @@ from django.shortcuts import get_object_or_404
 from ninja import File, Query, Router, UploadedFile
 from ninja.errors import HttpError
 from ninja.pagination import LimitOffsetPagination, paginate
+from pgvector.django import CosineDistance
 
 from src.apps.posts.enums import PostStatus, PostTypes
 from src.apps.posts.filters import PostFilterSchema
@@ -25,6 +26,7 @@ from src.apps.posts.schemas import (
     ResponseSchema,
 )
 from src.apps.reports.enums import ReportStatus
+from src.apps.users.models import Users
 from src.integrations.almanaque_ai import AlmanaqueAI
 from src.integrations.postsyncer import Postsyncer
 from src.integrations.postsyncer.schemas import PostsyncerSchema
@@ -64,6 +66,31 @@ def all(request: AuthenticatedRequest, filters: PostFilterSchema = Query(...)):
         )
 
     queryset = filters.filter(queryset)
+    return queryset
+
+
+@router.get(
+    "/recommended",
+    response={
+        200: list[PostSchema],
+        500: None,
+    },
+    auth=SupabaseJWTAuth(),
+)
+@paginate(LimitOffsetPagination)
+def recommended(request: AuthenticatedRequest):
+    user = Users.objects.get(uuid=request.auth.user.uuid)
+    queryset = (
+        Posts.objects.exclude(
+            reports__status=ReportStatus.APPROVED,
+            embedding=None,
+            reactions__user_id=user.uuid,
+        )
+        .select_related("owner", "user")
+        .prefetch_related("keywords", "reactions")
+        .annotate(distance=CosineDistance("embedding", user.preferences_embedding))
+        .order_by("distance")
+    )
     return queryset
 
 

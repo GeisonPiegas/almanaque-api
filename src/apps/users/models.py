@@ -2,6 +2,7 @@ import uuid
 
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from pgvector.django import VectorField
 
 
 class Users(models.Model):
@@ -10,6 +11,7 @@ class Users(models.Model):
     email = models.CharField(max_length=255, null=True, verbose_name=_("Email"))
     avatar_url = models.CharField(max_length=255, null=True, verbose_name=_("Avatar URL"))
     external_id = models.CharField(max_length=255, verbose_name=_("External ID"))
+    preferences_embedding = VectorField(dimensions=1536, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

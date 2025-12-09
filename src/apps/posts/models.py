@@ -13,6 +13,7 @@ from src.apps.posts.enums import (
     ReactionTypes,
 )
 from src.utils.models import SoftDeleteModel
+from src.utils.string import generate_random
 from src.utils.upload_file import path_and_rename_media, path_and_rename_thumbnail
 
 
@@ -33,6 +34,7 @@ class Keywords(models.Model):
 
 class Posts(SoftDeleteModel):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, verbose_name=_("Unique Identifier"))
+    slug = models.SlugField(max_length=255, unique=True, null=True, verbose_name=_("Slug"))
     title = models.CharField(null=True, max_length=255, verbose_name=_("Title"))
     description = models.TextField(null=True, verbose_name=_("Description"))
     type = models.CharField(null=True, verbose_name=_("Type"), choices=POST_TYPES)
@@ -74,9 +76,16 @@ class Posts(SoftDeleteModel):
                 name="post_embedding_ivfflat",
                 fields=["embedding"],
                 lists=100,
-                opclasses=["vector_cosine_ops"],  # para cosine distance
+                opclasses=["vector_cosine_ops"],
             ),
         ]
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = generate_random()
+            if self.objects.filter(slug=self.slug).exists():
+                self.slug = generate_random()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.uuid}"
@@ -154,6 +163,18 @@ class Reactions(models.Model):
 
     def __str__(self):
         return f"{self.uuid} - {self.type}"
+
+
+# class UserKeywordPreference(models.Model):
+#     user = models.ForeignKey("users.Users", on_delete=models.CASCADE, related_name="keyword_preferences")
+#     keyword = models.ForeignKey(Keywords, on_delete=models.CASCADE, related_name="user_preferences")
+#     score = models.FloatField(default=0)
+
+#     class Meta:
+#         unique_together = ("user", "keyword")
+
+#     def __str__(self):
+#         return f"{self.uuid} - {self.type}"
 
 
 class Favorites(models.Model):

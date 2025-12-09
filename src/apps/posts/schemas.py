@@ -48,6 +48,7 @@ class PostReactionSummarySchema(Schema):
 
 class PostSchema(Schema):
     uuid: UUID4 = Field(..., description=_("Unique Identifier"))
+    slug: str = Field(..., description=_("Slug"))
     title: str | None = Field(None, description=_("Title"))
     description: str | None = Field(None, description=_("Description"))
     type: PostTypes | None = Field(None, description=_("Type"))
