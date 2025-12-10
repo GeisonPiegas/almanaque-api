@@ -30,7 +30,7 @@ class PostsyncerSchema(Schema):
     source: str | None = Field(None, description=_("Source"))
     author: str | None = Field(None, description=_("Author"))
     title: str | None = Field(None, description=_("Title"))
-    thumbnail: str = Field(None, description=_("Thumbnail"))
+    thumbnail: str | None = Field(None, description=_("Thumbnail"))
     owner: OwnerSchema | None = Field(None, description=_("Owner"))
     view_count: int | None = Field(None, description=_("View Count"))
     like_count: int | None = Field(None, description=_("Like Count"))
