@@ -83,7 +83,7 @@ class Posts(SoftDeleteModel):
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = generate_random()
-            if self.objects.filter(slug=self.slug).exists():
+            if self.__class__.objects.filter(slug=self.slug).exists():
                 self.slug = generate_random()
         super().save(*args, **kwargs)
 
