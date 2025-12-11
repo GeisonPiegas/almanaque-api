@@ -128,10 +128,13 @@ def create(request: AuthenticatedRequest, payload: PostFormSchema):
 
         if movie := medias.get("videos", []):
             _type = PostTypes.VIDEO.value
-            _thumbnail = requests.get(social_media_data.get("thumbnail"))
-            thumbnail = ContentFile(_thumbnail.content, name="thumbnail.png")
             _movie = requests.get(movie[0].get("url"))
             media = ContentFile(_movie.content, name=f"{movie[0].get('id')}.{movie[0].get('extension')}")
+            if social_media_data.get("thumbnail", None):
+                _thumbnail = requests.get(social_media_data.get("thumbnail"))
+                thumbnail = ContentFile(_thumbnail.content, name="thumbnail.png")
+            else:
+                thumbnail: ContentFile = generate_video_thumbnail_from_upload(media)
 
         instance = Posts.objects.create(
             media=media,
@@ -290,17 +293,20 @@ def create_media_data(request: AuthenticatedRequest, payload: PostMediaFormSchem
         media = None
         thumbnail = None
 
-        if media.type == "images":
+        if payload.media.type == "images":
             _type = PostTypes.IMAGE.value
-            _picture = requests.get(media.url)
-            media = ContentFile(_picture.content, name=f"{media.id}.{media.extension}")
+            _picture = requests.get(payload.media.url)
+            media = ContentFile(_picture.content, name=f"{payload.media.id}.{payload.media.extension}")
 
-        if media.type == "videos":
+        if payload.media.type == "videos":
             _type = PostTypes.VIDEO.value
-            _thumbnail = requests.get(media.thumbnail)
-            thumbnail = ContentFile(_thumbnail.content, name="thumbnail.png")
-            _movie = requests.get(media.url)
-            media = ContentFile(_movie.content, name=f"{media.id}.{media.extension}")
+            _movie = requests.get(payload.media.url)
+            media = ContentFile(_movie.content, name=f"{payload.media.id}.{payload.media.extension}")
+            if payload.media.thumbnail:
+                _thumbnail = requests.get(payload.media.thumbnail)
+                thumbnail = ContentFile(_thumbnail.content, name="thumbnail.png")
+            else:
+                thumbnail: ContentFile = generate_video_thumbnail_from_upload(media)
 
         instance = Posts.objects.create(
             media=media,
